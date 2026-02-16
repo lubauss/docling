@@ -56,12 +56,12 @@ class DoclingParsePageBackend(PdfPageBackend):
             return
 
         config = DecodePageConfig()
-        config.keep_char_cells = self._keep_chars
+        config.keep_char_cells = True # we need to set this to True, otherwhise we have no lines
         config.keep_shapes = self._keep_lines
         config.keep_bitmaps = self._keep_images
         config.create_word_cells = self._create_words
         config.create_line_cells = self._create_textlines
-        config.enforce_same_font = True
+        config.enforce_same_font = False
 
         seg_page = self._dp_doc.get_page(self._page_no + 1, config=config)
 
