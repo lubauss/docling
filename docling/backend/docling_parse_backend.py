@@ -63,7 +63,7 @@ class DoclingParsePageBackend(PdfPageBackend):
         config.keep_bitmaps = self._keep_images
         config.create_word_cells = self._create_words
         config.create_line_cells = self._create_textlines
-        config.enforce_same_font = False
+        config.enforce_same_font = True
 
         seg_page = self._dp_doc.get_page(self._page_no + 1, config=config)
 

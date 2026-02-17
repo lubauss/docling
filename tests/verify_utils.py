@@ -59,6 +59,14 @@ def levenshtein(str1: str, str2: str) -> int:
 
 def verify_text(gt: str, pred: str, fuzzy: bool, fuzzy_threshold: float = 0.4):
     if len(gt) == 0 or not fuzzy:
+
+        # get a better view where it goes wrong ...
+        lines_gt = gt.split("\n")
+        lines_pr = pred.split("\n")
+        for i, line_gt in enumerate(lines_gt):
+            if i<len(lines_pr):
+                assert line_gt==lines_pr[i], f"{line_gt}!={lines_pr[i]}"
+        
         assert gt == pred, f"{gt}!={pred}"
     else:
         dist = levenshtein(gt, pred)
@@ -81,7 +89,7 @@ def verify_cells(
         assert num_true_cells == num_pred_cells, (
             f"num_true_cells!=num_pred_cells {num_true_cells}!={num_pred_cells}"
         )
-
+        
     return True
 
 
@@ -291,7 +299,7 @@ def verify_md(doc_pred_md: str, doc_true_md: str, fuzzy: bool):
 def verify_dt(doc_pred_dt: str, doc_true_dt: str, fuzzy: bool):
     return verify_text(doc_true_dt, doc_pred_dt, fuzzy)
 
-
+"""
 def verify_conversion_result_v1(
     input_path: Path,
     doc_result: ConversionResult,
@@ -358,7 +366,7 @@ def verify_conversion_result_v1(
         assert verify_dt(doc_pred_dt, doc_true_dt, fuzzy=fuzzy), (
             f"Mismatch in DocTags prediction for {input_path}"
         )
-
+"""
 
 def verify_conversion_result_v2(
     input_path: Path,
@@ -396,6 +404,7 @@ def verify_conversion_result_v2(
     md_path = gt_subpath.with_suffix(f"{engine_suffix}.md")
     dt_path = gt_subpath.with_suffix(f"{engine_suffix}.doctags.txt")
 
+    # print("generate: ", generate)
     if generate:  # only used when re-generating truth
         pages_path.parent.mkdir(parents=True, exist_ok=True)
 
