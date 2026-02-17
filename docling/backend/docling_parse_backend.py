@@ -55,6 +55,11 @@ class DoclingParsePageBackend(PdfPageBackend):
         if self._dpage is not None:
             return
 
+        # FIXME for the future: we will want to make this config a
+        # member of the class, i.e. self.config. Ultimately, we also
+        # should not need to keep the char's, but it seems no lines
+        # get created if we dont keep the chars. Updated version of
+        # docling-parse >v5.3.0 should fix this.
         config = DecodePageConfig()
         config.keep_char_cells = (
             True  # we need to set this to True, otherwhise we have no lines
