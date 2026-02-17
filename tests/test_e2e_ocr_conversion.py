@@ -19,7 +19,7 @@ from docling.datamodel.pipeline_options import (
 from docling.document_converter import DocumentConverter, PdfFormatOption
 
 from .test_data_gen_flag import GEN_TEST_DATA
-from .verify_utils import verify_conversion_result_v2
+from .verify_utils import verify_conversion_result_docling_parse
 
 GENERATE_V2 = GEN_TEST_DATA
 
@@ -107,7 +107,7 @@ def test_e2e_conversions():
 
             doc_result: ConversionResult = converter.convert(pdf_path)
 
-            verify_conversion_result_v2(
+            verify_conversion_result_docling_parse(
                 input_path=pdf_path,
                 doc_result=doc_result,
                 generate=GENERATE_V2,

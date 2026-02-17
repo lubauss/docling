@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 from typing import Optional
 
-import pytest
 from docling_core.types.doc import (
     CodeItem,
     DocItem,
@@ -13,10 +12,8 @@ from docling_core.types.doc import (
     TableItem,
     TextItem,
 )
-from docling_core.types.legacy_doc.document import ExportedCCSDocument as DsDocument
 from PIL import Image as PILImage
 from pydantic import BaseModel, TypeAdapter
-from pydantic.json import pydantic_encoder
 
 from docling.datamodel.base_models import ConversionStatus, Page
 from docling.datamodel.document import ConversionResult
@@ -59,14 +56,13 @@ def levenshtein(str1: str, str2: str) -> int:
 
 def verify_text(gt: str, pred: str, fuzzy: bool, fuzzy_threshold: float = 0.4):
     if len(gt) == 0 or not fuzzy:
-
         # get a better view where it goes wrong ...
         lines_gt = gt.split("\n")
         lines_pr = pred.split("\n")
         for i, line_gt in enumerate(lines_gt):
-            if i<len(lines_pr):
-                assert line_gt==lines_pr[i], f"{line_gt}!={lines_pr[i]}"
-        
+            if i < len(lines_pr):
+                assert line_gt == lines_pr[i], f"{line_gt}!={lines_pr[i]}"
+
         assert gt == pred, f"{gt}!={pred}"
     else:
         dist = levenshtein(gt, pred)
@@ -89,83 +85,11 @@ def verify_cells(
         assert num_true_cells == num_pred_cells, (
             f"num_true_cells!=num_pred_cells {num_true_cells}!={num_pred_cells}"
         )
-        
-    return True
-
-
-# def verify_maintext(doc_pred: DsDocument, doc_true: DsDocument):
-#     assert doc_true.main_text is not None, "doc_true cannot be None"
-#     assert doc_pred.main_text is not None, "doc_true cannot be None"
-#
-#     assert len(doc_true.main_text) == len(
-#         doc_pred.main_text
-#     ), f"document has different length of main-text than expected. {len(doc_true.main_text)}!={len(doc_pred.main_text)}"
-#
-#     for l, true_item in enumerate(doc_true.main_text):
-#         pred_item = doc_pred.main_text[l]
-#         # Validate type
-#         assert (
-#             true_item.obj_type == pred_item.obj_type
-#         ), f"Item[{l}] type does not match. expected[{true_item.obj_type}] != predicted [{pred_item.obj_type}]"
-#
-#         # Validate text ceels
-#         if isinstance(true_item, BaseText):
-#             assert isinstance(
-#                 pred_item, BaseText
-#             ), f"{pred_item} is not a BaseText element, but {true_item} is."
-#             assert true_item.text == pred_item.text
-#
-#     return True
-
-
-def verify_tables_v1(doc_pred: DsDocument, doc_true: DsDocument, fuzzy: bool):
-    if doc_true.tables is None:
-        # No tables to check
-        assert doc_pred.tables is None, "not expecting any table on this document"
-        return True
-
-    assert doc_pred.tables is not None, "no tables predicted, but expected in doc_true"
-
-    # print("Expected number of tables: {}, result: {}".format(len(doc_true.tables), len(doc_pred.tables)))
-
-    assert len(doc_true.tables) == len(doc_pred.tables), (
-        "document has different count of tables than expected."
-    )
-
-    for ix, true_item in enumerate(doc_true.tables):
-        pred_item = doc_pred.tables[ix]
-
-        assert true_item.num_rows == pred_item.num_rows, (
-            "table does not have the same #-rows"
-        )
-        assert true_item.num_cols == pred_item.num_cols, (
-            "table does not have the same #-cols"
-        )
-
-        assert true_item.data is not None, "documents are expected to have table data"
-        assert pred_item.data is not None, "documents are expected to have table data"
-
-        print("True: \n", true_item.export_to_dataframe().to_markdown())
-        print("Pred: \n", true_item.export_to_dataframe().to_markdown())
-
-        for i, row in enumerate(true_item.data):
-            for j, col in enumerate(true_item.data[i]):
-                # print("true: ", true_item.data[i][j].text)
-                # print("pred: ", pred_item.data[i][j].text)
-                # print("")
-
-                verify_text(
-                    true_item.data[i][j].text, pred_item.data[i][j].text, fuzzy=fuzzy
-                )
-
-                assert true_item.data[i][j].obj_type == pred_item.data[i][j].obj_type, (
-                    "table-cell does not have the same type"
-                )
 
     return True
 
 
-def verify_table_v2(true_item: TableItem, pred_item: TableItem, fuzzy: bool):
+def verify_table(true_item: TableItem, pred_item: TableItem, fuzzy: bool):
     assert true_item.data.num_rows == pred_item.data.num_rows, (
         "table does not have the same #-rows"
     )
@@ -206,7 +130,7 @@ def verify_table_v2(true_item: TableItem, pred_item: TableItem, fuzzy: bool):
     return True
 
 
-def verify_picture_image_v2(
+def verify_picture_image(
     true_image: PILImage.Image, pred_item: Optional[PILImage.Image]
 ):
     assert pred_item is not None, "predicted image is None"
@@ -214,12 +138,6 @@ def verify_picture_image_v2(
     assert true_image.mode == pred_item.mode
     # assert true_image.tobytes() == pred_item.tobytes()
     return True
-
-
-# def verify_output(doc_pred: DsDocument, doc_true: DsDocument):
-#     #assert verify_maintext(doc_pred, doc_true), "verify_maintext(doc_pred, doc_true)"
-#     assert verify_tables_v1(doc_pred, doc_true), "verify_tables(doc_pred, doc_true)"
-#     return True
 
 
 def verify_docitems(doc_pred: DoclingDocument, doc_true: DoclingDocument, fuzzy: bool):
@@ -260,7 +178,7 @@ def verify_docitems(doc_pred: DoclingDocument, doc_true: DoclingDocument, fuzzy:
         # Validate table content
         if isinstance(true_item, TableItem):
             assert isinstance(pred_item, TableItem), "Test item should be a TableItem"
-            assert verify_table_v2(true_item, pred_item, fuzzy=fuzzy), (
+            assert verify_table(true_item, pred_item, fuzzy=fuzzy), (
                 "Tables not matching"
             )
 
@@ -273,7 +191,7 @@ def verify_docitems(doc_pred: DoclingDocument, doc_true: DoclingDocument, fuzzy:
             true_image = true_item.get_image(doc=doc_true)
             pred_image = true_item.get_image(doc=doc_pred)
             if true_image is not None:
-                assert verify_picture_image_v2(true_image, pred_image), (
+                assert verify_picture_image(true_image, pred_image), (
                     "Picture image mismatch"
                 )
         # TODO: check picture annotations
@@ -299,76 +217,8 @@ def verify_md(doc_pred_md: str, doc_true_md: str, fuzzy: bool):
 def verify_dt(doc_pred_dt: str, doc_true_dt: str, fuzzy: bool):
     return verify_text(doc_true_dt, doc_pred_dt, fuzzy)
 
-"""
-def verify_conversion_result_v1(
-    input_path: Path,
-    doc_result: ConversionResult,
-    generate: bool = False,
-    ocr_engine: Optional[str] = None,
-    fuzzy: bool = False,
-    indent: int = 2,
-):
-    assert doc_result.status == ConversionStatus.SUCCESS, (
-        f"Doc {input_path} did not convert successfully."
-    )
 
-    with pytest.warns(DeprecationWarning, match="Use document instead"):
-        doc_pred: DsDocument = doc_result.legacy_document
-        doc_pred_md = doc_result.legacy_document.export_to_markdown()
-        doc_pred_dt = doc_result.legacy_document.export_to_document_tokens()
-
-    engine_suffix = "" if ocr_engine is None else f".{ocr_engine}"
-
-    gt_subpath = input_path.parent / "groundtruth" / "docling_v1" / input_path.name
-    if str(input_path.parent).endswith("pdf"):
-        gt_subpath = (
-            input_path.parent.parent / "groundtruth" / "docling_v1" / input_path.name
-        )
-
-    json_path = gt_subpath.with_suffix(f"{engine_suffix}.json")
-    md_path = gt_subpath.with_suffix(f"{engine_suffix}.md")
-    dt_path = gt_subpath.with_suffix(f"{engine_suffix}.doctags.txt")
-
-    if generate:  # only used when re-generating truth
-        json_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(json_path, mode="w", encoding="utf-8") as fw:
-            fw.write(json.dumps(doc_pred, default=pydantic_encoder, indent=indent))
-
-        md_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(md_path, mode="w", encoding="utf-8") as fw:
-            fw.write(doc_pred_md)
-
-        dt_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(dt_path, mode="w", encoding="utf-8") as fw:
-            fw.write(doc_pred_dt)
-    else:  # default branch in test
-        with open(json_path, encoding="utf-8") as fr:
-            doc_true: DsDocument = DsDocument.model_validate_json(fr.read())
-
-        with open(md_path, encoding="utf-8") as fr:
-            doc_true_md = fr.read()
-
-        with open(dt_path, encoding="utf-8") as fr:
-            doc_true_dt = fr.read()
-
-        # assert verify_output(
-        #    doc_pred, doc_true
-        # ), f"Mismatch in JSON prediction for {input_path}"
-
-        assert verify_tables_v1(doc_pred, doc_true, fuzzy=fuzzy), (
-            f"verify_tables(doc_pred, doc_true) mismatch for {input_path}"
-        )
-
-        assert verify_md(doc_pred_md, doc_true_md, fuzzy=fuzzy), (
-            f"Mismatch in Markdown prediction for {input_path}"
-        )
-
-        assert verify_dt(doc_pred_dt, doc_true_dt, fuzzy=fuzzy), (
-            f"Mismatch in DocTags prediction for {input_path}"
-        )
-"""
-
-def verify_conversion_result_v2(
+def verify_conversion_result_docling_parse(
     input_path: Path,
     doc_result: ConversionResult,
     generate: bool = False,
@@ -393,10 +243,10 @@ def verify_conversion_result_v2(
 
     engine_suffix = "" if ocr_engine is None else f".{ocr_engine}"
 
-    gt_subpath = input_path.parent / "groundtruth" / "docling_v2" / input_path.name
+    gt_subpath = input_path.parent / "groundtruth" / "docling" / input_path.name
     if str(input_path.parent).endswith("pdf"):
         gt_subpath = (
-            input_path.parent.parent / "groundtruth" / "docling_v2" / input_path.name
+            input_path.parent.parent / "groundtruth" / "docling" / input_path.name
         )
 
     pages_path = gt_subpath.with_suffix(f"{engine_suffix}.pages.meta.json")

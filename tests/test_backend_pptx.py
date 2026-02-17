@@ -33,7 +33,7 @@ def test_e2e_pptx_conversions():
         # print(f"converting {pptx_path}")
 
         gt_path = (
-            pptx_path.parent.parent / "groundtruth" / "docling_v2" / pptx_path.name
+            pptx_path.parent.parent / "groundtruth" / "docling" / pptx_path.name
         )
 
         conv_result: ConversionResult = converter.convert(pptx_path)

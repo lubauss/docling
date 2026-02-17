@@ -15,7 +15,7 @@ from docling.datamodel.pipeline_options import (
     TesseractOcrOptions,
 )
 from docling.document_converter import DocumentConverter, ImageFormatOption
-from tests.verify_utils import verify_conversion_result_v2
+from tests.verify_utils import verify_conversion_result_docling_parse
 
 from .test_data_gen_flag import GEN_TEST_DATA
 
@@ -78,7 +78,7 @@ def test_e2e_webp_conversions():
                 webp_path, raises_on_error=True
             )
 
-            verify_conversion_result_v2(
+            verify_conversion_result_docling_parse(
                 input_path=webp_path,
                 doc_result=doc_result,
                 generate=GENERATE,

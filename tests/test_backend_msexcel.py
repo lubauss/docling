@@ -45,7 +45,7 @@ def documents() -> list[tuple[Path, DoclingDocument]]:
         _log.debug(f"converting {excel_path}")
 
         gt_path = (
-            excel_path.parent.parent / "groundtruth" / "docling_v2" / excel_path.name
+            excel_path.parent.parent / "groundtruth" / "docling" / excel_path.name
         )
 
         conv_result: ConversionResult = converter.convert(excel_path)

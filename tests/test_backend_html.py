@@ -228,7 +228,7 @@ def test_e2e_html_conversions(html_paths):
 
     for html_path in html_paths:
         gt_path = (
-            html_path.parent.parent / "groundtruth" / "docling_v2" / html_path.name
+            html_path.parent.parent / "groundtruth" / "docling" / html_path.name
         )
 
         conv_result: ConversionResult = converter.convert(html_path)
@@ -313,7 +313,7 @@ def test_e2e_html_conversion_with_images(mock_local, mock_remote):
 
     # checking exported formats
     gt_path = (
-        "tests/data/groundtruth/docling_v2/" + str(Path(source).stem) + "_images.html"
+        "tests/data/groundtruth/docling/" + str(Path(source).stem) + "_images.html"
     )
     pred_md: str = res_local.document.export_to_markdown()
     assert verify_export(pred_md, gt_path + ".md", generate=GENERATE)

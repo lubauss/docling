@@ -38,7 +38,7 @@ def test_e2e_valid_csv_conversions():
     for csv_path in valid_csv_paths:
         print(f"converting {csv_path}")
 
-        gt_path = csv_path.parent.parent / "groundtruth" / "docling_v2" / csv_path.name
+        gt_path = csv_path.parent.parent / "groundtruth" / "docling" / csv_path.name
         if csv_path.stem in (
             "csv-too-few-columns",
             "csv-too-many-columns",

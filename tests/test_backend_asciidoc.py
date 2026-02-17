@@ -47,7 +47,7 @@ def test_asciidocs_examples():
         print(f"reading {fname}")
 
         bname = os.path.basename(fname)
-        gname = os.path.join("./tests/data/groundtruth/docling_v2/", bname + ".md")
+        gname = os.path.join("./tests/data/groundtruth/docling/", bname + ".md")
 
         doc_backend = _get_backend(Path(fname))
         doc = doc_backend.convert()

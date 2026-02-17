@@ -66,7 +66,7 @@ def test_e2e_deepseekocr_parsing():
             annotated_content = f.read()
 
         # Define groundtruth path
-        gt_path = md_path.parent.parent / "groundtruth" / "docling_v2" / md_path.name
+        gt_path = md_path.parent.parent / "groundtruth" / "docling" / md_path.name
 
         # Parse the markdown using mock_parsing
         doc: DoclingDocument = mock_parsing(annotated_content, md_path.name)
@@ -126,7 +126,7 @@ def test_e2e_deepseekocr_conversion():
     conv_result = converter.convert(pdf_path)
 
     # Load reference document
-    ref_path = Path("./tests/data/groundtruth/docling_v2/deepseek_title.md.json")
+    ref_path = Path("./tests/data/groundtruth/docling/deepseek_title.md.json")
     ref_doc = DoclingDocument.load_from_json(ref_path)
 
     # Validate conversion result

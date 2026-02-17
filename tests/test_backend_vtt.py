@@ -211,7 +211,7 @@ def test_e2e_vtt_conversions():
     converter = DocumentConverter(allowed_formats=[InputFormat.VTT])
 
     for vtt in vtt_paths:
-        gt_path = vtt.parent.parent / "groundtruth" / "docling_v2" / vtt.name
+        gt_path = vtt.parent.parent / "groundtruth" / "docling" / vtt.name
 
         conv_result: ConversionResult = converter.convert(vtt)
 

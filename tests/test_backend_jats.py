@@ -31,7 +31,7 @@ def test_e2e_jats_conversions(use_stream=False):
 
     for jats_path in jats_paths:
         gt_path = (
-            jats_path.parent.parent / "groundtruth" / "docling_v2" / jats_path.name
+            jats_path.parent.parent / "groundtruth" / "docling" / jats_path.name
         )
         if use_stream:
             buf = BytesIO(jats_path.open("rb").read())
