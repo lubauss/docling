@@ -1119,12 +1119,12 @@ class HTMLDocumentBackend(DeclarativeDocumentBackend):
                             seg_clean = HTMLDocumentBackend._clean_unicode(
                                 annotated_text.text.strip()
                             )
-                            prov = self._make_prov(
-                                text=seg_clean,
-                                tag=element,
-                                source_tag_id=annotated_text.source_tag_id,
-                            )
                             if annotated_text.code:
+                                prov = self._make_prov(
+                                    text=seg_clean,
+                                    tag=element,
+                                    source_tag_id=annotated_text.source_tag_id,
+                                )
                                 docling_code2 = doc.add_code(
                                     parent=self.parents[self.level],
                                     text=seg_clean,
@@ -1135,6 +1135,11 @@ class HTMLDocumentBackend(DeclarativeDocumentBackend):
                                 )
                                 added_refs.append(docling_code2.get_ref())
                             else:
+                                prov = self._make_text_prov(
+                                    text=seg_clean,
+                                    tag=element,
+                                    source_tag_id=annotated_text.source_tag_id,
+                                )
                                 docling_text2 = doc.add_text(
                                     parent=self.parents[self.level],
                                     label=DocItemLabel.TEXT,
@@ -1460,7 +1465,7 @@ class HTMLDocumentBackend(DeclarativeDocumentBackend):
         )
         annotated_text = annotated_text_list.to_single_text_element()
         text_clean = HTMLDocumentBackend._clean_unicode(annotated_text.text)
-        prov = self._make_prov(
+        prov = self._make_text_prov(
             text=text_clean,
             tag=tag,
             source_tag_id=annotated_text.source_tag_id,
@@ -1580,7 +1585,7 @@ class HTMLDocumentBackend(DeclarativeDocumentBackend):
                 # 3) add the list item
                 if li_text or inputs_in_li:
                     if len(min_parts) > 1:
-                        li_prov = self._make_prov(text=li_text, tag=li)
+                        li_prov = self._make_text_prov(text=li_text, tag=li)
                         # create an empty list element in order to hook the inline group onto that one
                         self.parents[self.level + 1] = doc.add_list_item(
                             text="",
@@ -1597,12 +1602,12 @@ class HTMLDocumentBackend(DeclarativeDocumentBackend):
                                     r"\s+|\n+", " ", annotated_text.text
                                 ).strip()
                                 li_clean = HTMLDocumentBackend._clean_unicode(li_text)
-                                prov = self._make_prov(
-                                    text=li_clean,
-                                    tag=li,
-                                    source_tag_id=annotated_text.source_tag_id,
-                                )
                                 if annotated_text.code:
+                                    prov = self._make_prov(
+                                        text=li_clean,
+                                        tag=li,
+                                        source_tag_id=annotated_text.source_tag_id,
+                                    )
                                     doc.add_code(
                                         parent=self.parents[self.level],
                                         text=li_clean,
@@ -1612,6 +1617,11 @@ class HTMLDocumentBackend(DeclarativeDocumentBackend):
                                         prov=prov,
                                     )
                                 else:
+                                    prov = self._make_text_prov(
+                                        text=li_clean,
+                                        tag=li,
+                                        source_tag_id=annotated_text.source_tag_id,
+                                    )
                                     doc.add_text(
                                         parent=self.parents[self.level],
                                         label=DocItemLabel.TEXT,
@@ -1638,7 +1648,7 @@ class HTMLDocumentBackend(DeclarativeDocumentBackend):
                         annotated_text = min_parts[0]
                         li_text = re.sub(r"\s+|\n+", " ", annotated_text.text).strip()
                         li_clean = HTMLDocumentBackend._clean_unicode(li_text)
-                        prov = self._make_prov(
+                        prov = self._make_text_prov(
                             text=li_clean,
                             tag=li,
                             source_tag_id=annotated_text.source_tag_id,
@@ -1670,7 +1680,7 @@ class HTMLDocumentBackend(DeclarativeDocumentBackend):
                                 self.parents[self.level + 1] = None
                                 self.level -= 1
                     else:
-                        li_prov = self._make_prov(text="", tag=li)
+                        li_prov = self._make_text_prov(text="", tag=li)
                         self.parents[self.level + 1] = doc.add_list_item(
                             text="",
                             enumerated=is_ordered,
@@ -1756,12 +1766,12 @@ class HTMLDocumentBackend(DeclarativeDocumentBackend):
                     for annotated_text in part:
                         if seg := annotated_text.text.strip():
                             seg_clean = HTMLDocumentBackend._clean_unicode(seg)
-                            prov = self._make_prov(
-                                text=seg_clean,
-                                tag=tag,
-                                source_tag_id=annotated_text.source_tag_id,
-                            )
                             if annotated_text.code:
+                                prov = self._make_prov(
+                                    text=seg_clean,
+                                    tag=tag,
+                                    source_tag_id=annotated_text.source_tag_id,
+                                )
                                 docling_code = doc.add_code(
                                     parent=self.parents[self.level],
                                     text=seg_clean,
@@ -1772,6 +1782,11 @@ class HTMLDocumentBackend(DeclarativeDocumentBackend):
                                 )
                                 added_refs.append(docling_code.get_ref())
                             else:
+                                prov = self._make_text_prov(
+                                    text=seg_clean,
+                                    tag=tag,
+                                    source_tag_id=annotated_text.source_tag_id,
+                                )
                                 docling_text = doc.add_text(
                                     parent=self.parents[self.level],
                                     label=DocItemLabel.TEXT,
@@ -1851,9 +1866,8 @@ class HTMLDocumentBackend(DeclarativeDocumentBackend):
         classes = tag.get("class")
         if not classes:
             return False
-        if isinstance(classes, str):
-            classes = [classes]
-        return _FORM_CONTAINER_CLASS in classes
+        class_values = [classes] if isinstance(classes, str) else classes
+        return _FORM_CONTAINER_CLASS in class_values
 
     @staticmethod
     def _is_value_in_key_scope(key_tag: Tag, value_tag: Tag) -> bool:
