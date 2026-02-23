@@ -30,6 +30,7 @@ from docling.datamodel.pipeline_options_vlm_model import (
     InlineVlmOptions,
 )
 from docling.datamodel.settings import settings
+from docling.datamodel.vlm_model_specs import DOCLING_BASE_PAGE_PROMPT
 from docling.experimental.datamodel.threaded_layout_vlm_pipeline_options import (
     ThreadedLayoutVlmPipelineOptions,
 )
@@ -93,7 +94,7 @@ class ThreadedLayoutVlmPipeline(BasePipeline):
                 augmented_prompt = base_prompt
 
                 # Only augment convert to docling base prompts
-                if base_prompt != "Convert this page to docling.":
+                if base_prompt != DOCLING_BASE_PAGE_PROMPT:
                     return base_prompt
 
                 # In this layout-aware pipeline, _internal_page is always provided
