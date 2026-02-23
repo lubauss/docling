@@ -42,6 +42,12 @@ class HTMLBackendOptions(BaseBackendOptions):
             "will use it to resolve relative paths in the HTML document."
         ),
     )
+    add_title: bool = Field(
+        True, description="Add the HTML title tag as furniture in the DoclingDocument."
+    )
+    infer_furniture: bool = Field(
+        True, description="Infer all the content before the first header as furniture."
+    )
 
 
 class MarkdownBackendOptions(BaseBackendOptions):
@@ -82,6 +88,19 @@ class MsExcelBackendOptions(BaseBackendOptions):
             "cells) as TextItem instead of TableItem."
         ),
     )
+    gap_tolerance: int = Field(
+        0,
+        description=(
+            "The tolerance (in number of empty rows/columns) for merging nearby "
+            "data clusters into a single table. Default is 0 (strict)."
+        ),
+    )
+
+
+class LatexBackendOptions(BaseBackendOptions):
+    """Options specific to the LaTeX backend."""
+
+    kind: Literal["latex"] = Field("latex", exclude=True, repr=False)
 
 
 BackendOptions = Annotated[
@@ -91,6 +110,7 @@ BackendOptions = Annotated[
         MarkdownBackendOptions,
         PdfBackendOptions,
         MsExcelBackendOptions,
+        LatexBackendOptions,
     ],
     Field(discriminator="kind"),
 ]

@@ -2,7 +2,6 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from docling.datamodel.layout_model_specs import DOCLING_LAYOUT_V2
 from docling.datamodel.pipeline_options import (
     LayoutOptions,
     granite_picture_description,
@@ -15,13 +14,20 @@ from docling.datamodel.vlm_model_specs import (
     SMOLDOCLING_MLX,
     SMOLDOCLING_TRANSFORMERS,
 )
-from docling.models.code_formula_model import CodeFormulaModel
-from docling.models.document_picture_classifier import DocumentPictureClassifier
-from docling.models.easyocr_model import EasyOcrModel
-from docling.models.layout_model import LayoutModel
-from docling.models.picture_description_vlm_model import PictureDescriptionVlmModel
-from docling.models.rapid_ocr_model import RapidOcrModel
-from docling.models.table_structure_model import TableStructureModel
+from docling.models.stages.chart_extraction.granite_vision import (
+    ChartExtractionModelGraniteVision,
+)
+from docling.models.stages.code_formula.code_formula_model import CodeFormulaModel
+from docling.models.stages.layout.layout_model import LayoutModel
+from docling.models.stages.ocr.easyocr_model import EasyOcrModel
+from docling.models.stages.ocr.rapid_ocr_model import RapidOcrModel
+from docling.models.stages.picture_classifier.document_picture_classifier import (
+    DocumentPictureClassifier,
+    DocumentPictureClassifierOptions,
+)
+from docling.models.stages.table_structure.table_structure_model import (
+    TableStructureModel,
+)
 from docling.models.utils.hf_model_download import download_hf_model
 
 _log = logging.getLogger(__name__)
@@ -42,6 +48,7 @@ def download_models(
     with_smoldocling: bool = False,
     with_smoldocling_mlx: bool = False,
     with_granite_vision: bool = False,
+    with_granite_chart_extraction: bool = False,
     with_rapidocr: bool = True,
     with_easyocr: bool = False,
 ):
@@ -69,8 +76,13 @@ def download_models(
 
     if with_picture_classifier:
         _log.info("Downloading picture classifier model...")
+        pic_opts = DocumentPictureClassifierOptions.from_preset(
+            "document_figure_classifier_v2"
+        )
         DocumentPictureClassifier.download_models(
-            local_dir=output_dir / DocumentPictureClassifier._model_repo_folder,
+            repo_id=pic_opts.repo_id,
+            revision=pic_opts.revision,
+            local_dir=output_dir / pic_opts.repo_cache_folder,
             force=force,
             progress=progress,
         )
@@ -85,6 +97,7 @@ def download_models(
 
     if with_smolvlm:
         _log.info("Downloading SmolVlm model...")
+        assert smolvlm_picture_description.repo_id is not None
         download_hf_model(
             repo_id=smolvlm_picture_description.repo_id,
             local_dir=output_dir / smolvlm_picture_description.repo_cache_folder,
@@ -130,9 +143,18 @@ def download_models(
 
     if with_granite_vision:
         _log.info("Downloading Granite Vision model...")
+        assert granite_picture_description.repo_id is not None
         download_hf_model(
             repo_id=granite_picture_description.repo_id,
             local_dir=output_dir / granite_picture_description.repo_cache_folder,
+            force=force,
+            progress=progress,
+        )
+
+    if with_granite_chart_extraction:
+        _log.info("Downloading Granite Vision Charts Extraction model...")
+        ChartExtractionModelGraniteVision.download_models(
+            local_dir=output_dir / ChartExtractionModelGraniteVision._model_repo_folder,
             force=force,
             progress=progress,
         )

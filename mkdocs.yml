@@ -57,11 +57,13 @@ nav:
     - Getting started : 
       - Installation: getting_started/installation.md
       - Quickstart: getting_started/quickstart.md
+      - ⚡ RTX GPU: getting_started/rtx.md
     - Usage:
       - Advanced options: usage/advanced_options.md
       - Supported formats: usage/supported_formats.md
       - Enrichment features: usage/enrichments.md
       - Vision models: usage/vision_models.md
+      - Model catalog: usage/model_catalog.md
       - GPU support: usage/gpu.md
       - MCP server: usage/mcp.md
       - Jobkit: usage/jobkit.md
@@ -112,6 +114,8 @@ nav:
     - 🖼️ Picture annotation:
       - "Annotate picture with local VLM": examples/pictures_description.ipynb
       - "Annotate picture with remote VLM": examples/pictures_description_api.py
+    - 🔤 Enrichments:
+      - "Code & formula": examples/code_formula_granite_docling.py
     - ✨ Enrichment development:
       - "Figure enrichment": examples/develop_picture_enrichment.py
       - "Formula enrichment": examples/develop_formula_understanding.py
@@ -140,6 +144,7 @@ nav:
       - "LangChain": integrations/langchain.md
       - "Langflow": integrations/langflow.md
       - "LlamaIndex": integrations/llamaindex.md
+      - "Semantica": integrations/semantica.md
       - "txtai": integrations/txtai.md
     - ⭐️ Featured:
       - "Apify": integrations/apify.md
@@ -191,13 +196,15 @@ plugins:
   - mkdocs-jupyter
   - mkdocstrings:
       default_handler: python
-      options:
-        extensions:
-          - griffe_pydantic:
-              schema: true
-        preload_modules:
-          - docling
-          - docling_core
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            extensions:
+              - griffe_pydantic:
+                  schema: true
+            preload_modules:
+              - docling_core
 
 extra_css:
   - stylesheets/extra.css

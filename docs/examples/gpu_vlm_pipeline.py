@@ -2,6 +2,7 @@
 #
 # What this example does
 # - Run a conversion using the best setup for GPU using VLM models
+# - Demonstrates using presets with API runtime (vLLM) for high-throughput GPU processing
 #
 # Requirements
 # - Python 3.10+
@@ -35,13 +36,16 @@ from pathlib import Path
 import numpy as np
 from pydantic import TypeAdapter
 
-from docling.datamodel import vlm_model_specs
 from docling.datamodel.base_models import ConversionStatus, InputFormat
 from docling.datamodel.pipeline_options import (
+    VlmConvertOptions,
     VlmPipelineOptions,
 )
-from docling.datamodel.pipeline_options_vlm_model import ApiVlmOptions, ResponseFormat
 from docling.datamodel.settings import settings
+from docling.datamodel.vlm_engine_options import (
+    ApiVlmEngineOptions,
+    VlmEngineType,
+)
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.pipeline.vlm_pipeline import VlmPipeline
 from docling.utils.profiling import ProfilingItem
@@ -62,20 +66,14 @@ def main():
     # input_doc_path = data_folder / "pdf" / "2305.03393v1.pdf"  # 14 pages
     input_doc_path = data_folder / "pdf" / "redp5110_sampled.pdf"  # 18 pages
 
-    vlm_options = ApiVlmOptions(
-        url="http://localhost:8000/v1/chat/completions",  # LM studio defaults to port 1234, VLLM to 8000
-        params=dict(
-            model=vlm_model_specs.GRANITEDOCLING_TRANSFORMERS.repo_id,
-            max_tokens=4096,
-            skip_special_tokens=True,
+    # Use the granite_docling preset with API runtime override for vLLM
+    vlm_options = VlmConvertOptions.from_preset(
+        "granite_docling",
+        engine_options=ApiVlmEngineOptions(
+            runtime_type=VlmEngineType.API,
+            url="http://localhost:8000/v1/chat/completions",
+            concurrency=BATCH_SIZE,
         ),
-        prompt=vlm_model_specs.GRANITEDOCLING_TRANSFORMERS.prompt,
-        timeout=90,
-        scale=2.0,
-        temperature=0.0,
-        concurrency=BATCH_SIZE,
-        stop_strings=["</doctag>", "<|end_of_text|>"],
-        response_format=ResponseFormat.DOCTAGS,
     )
 
     pipeline_options = VlmPipelineOptions(

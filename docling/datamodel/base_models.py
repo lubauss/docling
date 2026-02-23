@@ -70,11 +70,13 @@ class InputFormat(str, Enum):
     JSON_DOCLING = "json_docling"
     AUDIO = "audio"
     VTT = "vtt"
+    LATEX = "latex"
 
 
 class OutputFormat(str, Enum):
     MARKDOWN = "md"
     JSON = "json"
+    YAML = "yaml"
     HTML = "html"
     HTML_SPLIT_PAGE = "html_split_page"
     TEXT = "text"
@@ -97,6 +99,7 @@ FormatToExtensions: dict[InputFormat, list[str]] = {
     InputFormat.JSON_DOCLING: ["json"],
     InputFormat.AUDIO: ["wav", "mp3", "m4a", "aac", "ogg", "flac", "mp4", "avi", "mov"],
     InputFormat.VTT: ["vtt"],
+    InputFormat.LATEX: ["tex", "latex"],
 }
 
 FormatToMimeType: dict[InputFormat, list[str]] = {
@@ -146,6 +149,7 @@ FormatToMimeType: dict[InputFormat, list[str]] = {
         "video/quicktime",
     ],
     InputFormat.VTT: ["text/vtt"],
+    InputFormat.LATEX: ["text/x-tex", "application/x-tex", "text/x-latex"],
 }
 
 MimeTypeToFormat: dict[str, list[InputFormat]] = {

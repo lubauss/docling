@@ -1,3 +1,4 @@
+import datetime
 import importlib
 import logging
 import platform
@@ -24,12 +25,12 @@ from pydantic import TypeAdapter
 from rich.console import Console
 
 from docling.backend.docling_parse_backend import DoclingParseDocumentBackend
-from docling.backend.docling_parse_v2_backend import DoclingParseV2DocumentBackend
-from docling.backend.docling_parse_v4_backend import DoclingParseV4DocumentBackend
 from docling.backend.image_backend import ImageDocumentBackend
+from docling.backend.latex_backend import LatexDocumentBackend
 from docling.backend.mets_gbs_backend import MetsGbsDocumentBackend
 from docling.backend.pdf_backend import PdfDocumentBackend
 from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
+from docling.datamodel import vlm_model_specs
 from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
 from docling.datamodel.asr_model_specs import (
     WHISPER_BASE,
@@ -74,35 +75,33 @@ from docling.datamodel.pipeline_options import (
     TableStructureOptions,
     TesseractCliOcrOptions,
     TesseractOcrOptions,
+    VlmConvertOptions,
     VlmPipelineOptions,
+    normalize_pdf_backend,
 )
 from docling.datamodel.settings import settings
-from docling.datamodel.vlm_model_specs import (
-    GOT2_TRANSFORMERS,
-    GRANITE_VISION_OLLAMA,
-    GRANITE_VISION_TRANSFORMERS,
-    GRANITEDOCLING_MLX,
-    GRANITEDOCLING_TRANSFORMERS,
-    GRANITEDOCLING_VLLM,
-    SMOLDOCLING_MLX,
-    SMOLDOCLING_TRANSFORMERS,
-    SMOLDOCLING_VLLM,
-    VlmModelType,
-)
+from docling.datamodel.vlm_model_specs import VlmModelType
 from docling.document_converter import (
     AudioFormatOption,
     DocumentConverter,
     ExcelFormatOption,
     FormatOption,
     HTMLFormatOption,
+    LatexFormatOption,
     MarkdownFormatOption,
     PdfFormatOption,
     PowerpointFormatOption,
     WordFormatOption,
 )
-from docling.models.factories import get_ocr_factory
+from docling.models.factories import (
+    get_layout_factory,
+    get_ocr_factory,
+    get_table_structure_factory,
+)
+from docling.models.factories.base_factory import BaseFactory
 from docling.pipeline.asr_pipeline import AsrPipeline
 from docling.pipeline.vlm_pipeline import VlmPipeline
+from docling.utils.profiling import ProfilingItem
 
 warnings.filterwarnings(action="ignore", category=UserWarning, module="pydantic|torch")
 warnings.filterwarnings(action="ignore", category=FutureWarning, module="easyocr")
@@ -114,6 +113,9 @@ err_console = Console(stderr=True)
 
 ocr_factory_internal = get_ocr_factory(allow_external_plugins=False)
 ocr_engines_enum_internal = ocr_factory_internal.get_enum()
+
+# Get available VLM presets from the registry
+vlm_preset_ids = VlmConvertOptions.list_preset_ids()
 
 DOCLING_ASCII_ART = r"""
                              ████ ██████
@@ -182,18 +184,27 @@ def version_callback(value: bool):
 def show_external_plugins_callback(value: bool):
     if value:
         ocr_factory_all = get_ocr_factory(allow_external_plugins=True)
-        table = rich.table.Table(title="Available OCR engines")
-        table.add_column("Name", justify="right")
-        table.add_column("Plugin")
-        table.add_column("Package")
-        for meta in ocr_factory_all.registered_meta.values():
-            if not meta.module.startswith("docling."):
-                table.add_row(
-                    f"[bold]{meta.kind}[/bold]",
-                    meta.plugin_name,
-                    meta.module.split(".")[0],
-                )
-        rich.print(table)
+        layout_factory_all = get_layout_factory(allow_external_plugins=True)
+        table_factory_all = get_table_structure_factory(allow_external_plugins=True)
+
+        def print_external_plugins(factory: BaseFactory, factory_name: str):
+            table = rich.table.Table(title=f"Available {factory_name} engines")
+            table.add_column("Name", justify="right")
+            table.add_column("Plugin")
+            table.add_column("Package")
+            for meta in factory.registered_meta.values():
+                if not meta.module.startswith("docling."):
+                    table.add_row(
+                        f"[bold]{meta.kind}[/bold]",
+                        meta.plugin_name,
+                        meta.module.split(".")[0],
+                    )
+            rich.print(table)
+
+        print_external_plugins(ocr_factory_all, "OCR")
+        print_external_plugins(layout_factory_all, "layout")
+        print_external_plugins(table_factory_all, "table")
+
         raise typer.Exit()
 
 
@@ -201,12 +212,15 @@ def export_documents(
     conv_results: Iterable[ConversionResult],
     output_dir: Path,
     export_json: bool,
+    export_yaml: bool,
     export_html: bool,
     export_html_split_page: bool,
     show_layout: bool,
     export_md: bool,
     export_txt: bool,
     export_doctags: bool,
+    print_timings: bool,
+    export_timings: bool,
     image_export_mode: ImageRefMode,
 ):
     success_count = 0
@@ -222,6 +236,14 @@ def export_documents(
                 fname = output_dir / f"{doc_filename}.json"
                 _log.info(f"writing JSON output to {fname}")
                 conv_res.document.save_as_json(
+                    filename=fname, image_mode=image_export_mode
+                )
+
+            # Export YAML format:
+            if export_yaml:
+                fname = output_dir / f"{doc_filename}.yaml"
+                _log.info(f"writing YAML output to {fname}")
+                conv_res.document.save_as_yaml(
                     filename=fname, image_mode=image_export_mode
                 )
 
@@ -282,6 +304,50 @@ def export_documents(
                 fname = output_dir / f"{doc_filename}.doctags"
                 _log.info(f"writing Doc Tags output to {fname}")
                 conv_res.document.save_as_doctags(filename=fname)
+
+            # Print profiling timings
+            if print_timings:
+                table = rich.table.Table(title=f"Profiling Summary, {doc_filename}")
+                metric_columns = [
+                    "Stage",
+                    "count",
+                    "total",
+                    "mean",
+                    "median",
+                    "min",
+                    "max",
+                    "0.1 percentile",
+                    "0.9 percentile",
+                ]
+                for col in metric_columns:
+                    table.add_column(col, style="bold")
+                for stage_key, item in conv_res.timings.items():
+                    col_dict = {
+                        "Stage": stage_key,
+                        "count": item.count,
+                        "total": item.total(),
+                        "mean": item.avg(),
+                        "median": item.percentile(0.5),
+                        "min": item.percentile(0.0),
+                        "max": item.percentile(1.0),
+                        "0.1 percentile": item.percentile(0.1),
+                        "0.9 percentile": item.percentile(0.9),
+                    }
+                    row_values = [str(col_dict[col]) for col in metric_columns]
+                    table.add_row(*row_values)
+
+                console.print(table)
+
+            # Export profiling timings
+            if export_timings:
+                TimingsT = TypeAdapter(dict[str, ProfilingItem])
+                now = datetime.datetime.now()
+                timings_file = Path(
+                    output_dir / f"{doc_filename}-timings-{now:%Y-%m-%d_%H-%M-%S}.json"
+                )
+                with timings_file.open("wb") as fp:
+                    r = TimingsT.dump_json(conv_res.timings, indent=2)
+                    fp.write(r)
 
         else:
             _log.warning(f"Document {conv_res.input.file} failed to convert.")
@@ -346,9 +412,12 @@ def convert(  # noqa: C901
         typer.Option(..., help="Choose the pipeline to process PDF or image files."),
     ] = ProcessingPipeline.STANDARD,
     vlm_model: Annotated[
-        VlmModelType,
-        typer.Option(..., help="Choose the VLM model to use with PDF or image files."),
-    ] = VlmModelType.GRANITEDOCLING,
+        str,
+        typer.Option(
+            ...,
+            help=f"Choose the VLM preset to use with PDF or image files. Available presets: {', '.join(vlm_preset_ids)}",
+        ),
+    ] = "granite_docling",
     asr_model: Annotated[
         AsrModelType,
         typer.Option(..., help="Choose the ASR model to use with audio/video files."),
@@ -400,7 +469,7 @@ def convert(  # noqa: C901
     ] = None,
     pdf_backend: Annotated[
         PdfBackend, typer.Option(..., help="The PDF backend to use.")
-    ] = PdfBackend.DLPARSE_V4,
+    ] = PdfBackend.DOCLING_PARSE,
     pdf_password: Annotated[
         Optional[str], typer.Option(..., help="Password for protected PDF documents")
     ] = None,
@@ -426,6 +495,13 @@ def convert(  # noqa: C901
     enrich_picture_description: Annotated[
         bool,
         typer.Option(..., help="Enable the picture description model in the pipeline."),
+    ] = False,
+    enrich_chart_extraction: Annotated[
+        bool,
+        typer.Option(
+            ...,
+            help="Enable chart extraction to convert bar, pie, and line charts to tabular format.",
+        ),
     ] = False,
     artifacts_path: Annotated[
         Optional[Path],
@@ -523,6 +599,20 @@ def convert(  # noqa: C901
             help=f"Number of pages processed in one batch. Default: {settings.perf.page_batch_size}",
         ),
     ] = settings.perf.page_batch_size,
+    profiling: Annotated[
+        bool,
+        typer.Option(
+            ...,
+            help="If enabled, it summarizes profiling details for all conversion stages.",
+        ),
+    ] = False,
+    save_profiling: Annotated[
+        bool,
+        typer.Option(
+            ...,
+            help="If enabled, it saves the profiling summaries to json.",
+        ),
+    ] = False,
 ):
     log_format = "%(asctime)s\t%(levelname)s\t%(name)s: %(message)s"
 
@@ -546,6 +636,9 @@ def convert(  # noqa: C901
     if headers is not None:
         headers_t = TypeAdapter(Dict[str, str])
         parsed_headers = headers_t.validate_json(headers)
+
+    if profiling or save_profiling:
+        settings.debug.profile_pipeline_timings = True
 
     with tempfile.TemporaryDirectory() as tempdir:
         input_doc_paths: List[Path] = []
@@ -602,6 +695,7 @@ def convert(  # noqa: C901
             to_formats = [OutputFormat.MARKDOWN]
 
         export_json = OutputFormat.JSON in to_formats
+        export_yaml = OutputFormat.YAML in to_formats
         export_html = OutputFormat.HTML in to_formats
         export_html_split_page = OutputFormat.HTML_SPLIT_PAGE in to_formats
         export_md = OutputFormat.MARKDOWN in to_formats
@@ -618,7 +712,7 @@ def convert(  # noqa: C901
         if ocr_lang_list is not None:
             ocr_options.lang = ocr_lang_list
         if psm is not None and isinstance(
-            ocr_options, (TesseractOcrOptions, TesseractCliOcrOptions)
+            ocr_options, TesseractOcrOptions | TesseractCliOcrOptions
         ):
             ocr_options.psm = psm
 
@@ -644,6 +738,7 @@ def convert(  # noqa: C901
                 do_formula_enrichment=enrich_formula,
                 do_picture_description=enrich_picture_description,
                 do_picture_classification=enrich_picture_classes,
+                do_chart_extraction=enrich_chart_extraction,
                 document_timeout=document_timeout,
             )
             if isinstance(
@@ -661,15 +756,12 @@ def convert(  # noqa: C901
                 )
                 pipeline_options.images_scale = 2
 
+            # Normalize deprecated backend values
+            pdf_backend = normalize_pdf_backend(pdf_backend)
+
             backend: Type[PdfDocumentBackend]
-            if pdf_backend == PdfBackend.DLPARSE_V1:
-                backend = DoclingParseDocumentBackend
-                pdf_backend_options = None
-            elif pdf_backend == PdfBackend.DLPARSE_V2:
-                backend = DoclingParseV2DocumentBackend
-                pdf_backend_options = None
-            elif pdf_backend == PdfBackend.DLPARSE_V4:
-                backend = DoclingParseV4DocumentBackend  # type: ignore
+            if pdf_backend == PdfBackend.DOCLING_PARSE:
+                backend = DoclingParseDocumentBackend  # type: ignore
             elif pdf_backend == PdfBackend.PYPDFIUM2:
                 backend = PyPdfiumDocumentBackend  # type: ignore
             else:
@@ -693,6 +785,7 @@ def convert(  # noqa: C901
             simple_format_option = ConvertPipelineOptions(
                 do_picture_description=enrich_picture_description,
                 do_picture_classification=enrich_picture_classes,
+                do_chart_extraction=enrich_chart_extraction,
             )
             if artifacts_path is not None:
                 simple_format_option.artifacts_path = artifacts_path
@@ -723,6 +816,9 @@ def convert(  # noqa: C901
                 InputFormat.MD: MarkdownFormatOption(
                     pipeline_options=simple_format_option
                 ),
+                InputFormat.LATEX: LatexFormatOption(
+                    pipeline_options=simple_format_option
+                ),
             }
 
         elif pipeline == ProcessingPipeline.VLM:
@@ -730,53 +826,18 @@ def convert(  # noqa: C901
                 enable_remote_services=enable_remote_services,
             )
 
-            if vlm_model == VlmModelType.GRANITE_VISION:
-                pipeline_options.vlm_options = GRANITE_VISION_TRANSFORMERS
-            elif vlm_model == VlmModelType.GRANITE_VISION_OLLAMA:
-                pipeline_options.vlm_options = GRANITE_VISION_OLLAMA
-            elif vlm_model == VlmModelType.GOT_OCR_2:
-                pipeline_options.vlm_options = GOT2_TRANSFORMERS
-            elif vlm_model == VlmModelType.SMOLDOCLING:
-                pipeline_options.vlm_options = SMOLDOCLING_TRANSFORMERS
-                if sys.platform == "darwin":
-                    try:
-                        import mlx_vlm
-
-                        pipeline_options.vlm_options = SMOLDOCLING_MLX
-                    except ImportError:
-                        if sys.version_info < (3, 14):
-                            _log.warning(
-                                "To run SmolDocling faster, please install mlx-vlm:\n"
-                                "pip install mlx-vlm"
-                            )
-                        else:
-                            _log.warning(
-                                "You can run SmolDocling faster with MLX support, but it is unfortunately not yet available on Python 3.14."
-                            )
-
-            elif vlm_model == VlmModelType.GRANITEDOCLING:
-                pipeline_options.vlm_options = GRANITEDOCLING_TRANSFORMERS
-                if sys.platform == "darwin":
-                    try:
-                        import mlx_vlm
-
-                        pipeline_options.vlm_options = GRANITEDOCLING_MLX
-                    except ImportError:
-                        if sys.version_info < (3, 14):
-                            _log.warning(
-                                "To run GraniteDocling faster, please install mlx-vlm:\n"
-                                "pip install mlx-vlm"
-                            )
-                        else:
-                            _log.warning(
-                                "You can run GraniteDocling faster with MLX support, but it is unfortunately not yet available on Python 3.14."
-                            )
-
-            elif vlm_model == VlmModelType.SMOLDOCLING_VLLM:
-                pipeline_options.vlm_options = SMOLDOCLING_VLLM
-
-            elif vlm_model == VlmModelType.GRANITEDOCLING_VLLM:
-                pipeline_options.vlm_options = GRANITEDOCLING_VLLM
+            # Use the new preset system
+            try:
+                pipeline_options.vlm_options = VlmConvertOptions.from_preset(vlm_model)
+                _log.info(f"Using VLM preset: {vlm_model}")
+            except KeyError:
+                err_console.print(
+                    f"[red]Error: VLM preset '{vlm_model}' not found.[/red]"
+                )
+                err_console.print(
+                    f"[yellow]Available presets: {', '.join(vlm_preset_ids)}[/yellow]"
+                )
+                raise typer.Abort()
 
             pdf_format_option = PdfFormatOption(
                 pipeline_cls=VlmPipeline, pipeline_options=pipeline_options
@@ -873,12 +934,15 @@ def convert(  # noqa: C901
             conv_results,
             output_dir=output,
             export_json=export_json,
+            export_yaml=export_yaml,
             export_html=export_html,
             export_html_split_page=export_html_split_page,
             show_layout=show_layout,
             export_md=export_md,
             export_txt=export_txt,
             export_doctags=export_doctags,
+            print_timings=profiling,
+            export_timings=save_profiling,
             image_export_mode=image_export_mode,
         )
 

@@ -4,8 +4,6 @@ from pathlib import Path
 import pytest
 
 from docling.backend.docling_parse_backend import DoclingParseDocumentBackend
-from docling.backend.docling_parse_v2_backend import DoclingParseV2DocumentBackend
-from docling.backend.docling_parse_v4_backend import DoclingParseV4DocumentBackend
 from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
 from docling.datamodel.base_models import ConversionStatus, InputFormat, QualityGrade
@@ -50,10 +48,13 @@ def test_accelerator_options():
     # Use API
     ao2 = AcceleratorOptions(num_threads=2, device=AcceleratorDevice.MPS)
     ao3 = AcceleratorOptions(num_threads=3, device=AcceleratorDevice.CUDA)
+    ao4 = AcceleratorOptions(num_threads=4, device=AcceleratorDevice.XPU)
     assert ao2.num_threads == 2
     assert ao2.device == AcceleratorDevice.MPS
     assert ao3.num_threads == 3
     assert ao3.device == AcceleratorDevice.CUDA
+    assert ao4.num_threads == 4
+    assert ao4.device == AcceleratorDevice.XPU
 
     # Use envvars (regular + alternative) and default values
     os.environ["OMP_NUM_THREADS"] = "1"
@@ -67,15 +68,15 @@ def test_accelerator_options():
 
     # Use envvars and override in init
     os.environ["DOCLING_DEVICE"] = "cpu"
-    ao4 = AcceleratorOptions(num_threads=5, device=AcceleratorDevice.MPS)
-    assert ao4.num_threads == 5
-    assert ao4.device == AcceleratorDevice.MPS
+    ao5 = AcceleratorOptions(num_threads=5, device=AcceleratorDevice.MPS)
+    assert ao5.num_threads == 5
+    assert ao5.device == AcceleratorDevice.MPS
 
     # Use regular and alternative envvar
     os.environ["DOCLING_NUM_THREADS"] = "2"
-    ao5 = AcceleratorOptions()
-    assert ao5.num_threads == 2
-    assert ao5.device == AcceleratorDevice.CPU
+    ao6 = AcceleratorOptions()
+    assert ao6.num_threads == 2
+    assert ao6.device == AcceleratorDevice.CPU
 
     # Use wrong values
     is_exception = False
@@ -91,9 +92,9 @@ def test_accelerator_options():
     del os.environ["DOCLING_NUM_THREADS"]
     del os.environ["DOCLING_DEVICE"]
     os.environ["OMP_NUM_THREADS"] = "wrong"
-    ao6 = AcceleratorOptions()
-    assert ao6.num_threads == 4
-    assert ao6.device == AcceleratorDevice.AUTO
+    ao7 = AcceleratorOptions()
+    assert ao7.num_threads == 4
+    assert ao7.device == AcceleratorDevice.AUTO
 
 
 def test_e2e_conversions(test_doc_path):
@@ -172,8 +173,6 @@ def test_parser_backends(test_doc_path):
     pipeline_options.do_table_structure = False
 
     for backend_t in [
-        DoclingParseV4DocumentBackend,
-        DoclingParseV2DocumentBackend,
         DoclingParseDocumentBackend,
         PyPdfiumDocumentBackend,
     ]:
